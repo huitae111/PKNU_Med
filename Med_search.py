@@ -6,9 +6,8 @@ import cv2
 import requests
 import xml.etree.ElementTree as ET
 import os
-import json
 from google.cloud import vision
-import io
+from google.oauth2 import service_account
 
 st.set_page_config(page_title="약 모양 그리기 검색기", layout="centered")
 st.title("💊 약 모양 그리기 검색기")
@@ -26,27 +25,16 @@ canvas_result = st_canvas(
     key="canvas",
 )
 
-# --- 구글 서비스 계정 인증 JSON 파일 만들기 ---
-# secrets.toml에 아래처럼 google_cloud 키 안에 JSON 키 전체를 넣어야 함
-# 예: st.secrets["google_cloud"]["private_key"], "client_email" 등
+# Google Cloud Vision API 인증
 google_creds = st.secrets["google_cloud"]
-
-# private_key는 줄바꿈 문자(\n)를 실제 줄바꿈으로 변경
-google_creds["private_key"] = google_creds["private_key"].replace("\\n", "\n")
-
-with open("service_account.json", "w") as f:
-    json.dump(google_creds, f)
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account.json"
-
-# Vision API 클라이언트 생성
-client = vision.ImageAnnotatorClient()
+credentials = service_account.Credentials.from_service_account_info(google_creds)
+client = vision.ImageAnnotatorClient(credentials=credentials)
 
 def process_pill_image(pil_image):
-    # 흑백 변환 + 도형 추정
-    img = np.array(pil_image.convert("L"))
+    img = np.array(pil_image.convert("L"))  # 흑백 변환
     _, thresh = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY_INV)
 
+    # 도형 추정
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     shape = "기타"
     for cnt in contours:
@@ -55,26 +43,25 @@ def process_pill_image(pil_image):
             shape = "원형"
         elif len(approx) >= 4:
             shape = "타원형"
-        else:
-            shape = "기타"
 
-    # PIL 이미지를 바이트 형태로 변환 (Vision API 요청용)
-    buffer = io.BytesIO()
-    pil_image.save(buffer, format="PNG")
-    image_content = buffer.getvalue()
+    # OCR (Google Vision API 사용)
+    buffered = pil_image.convert("RGB")
+    buffered.save("temp.png")
+    with open("temp.png", "rb") as image_file:
+        content = image_file.read()
 
-    image = vision.Image(content=image_content)
+    image = vision.Image(content=content)
     response = client.text_detection(image=image)
-
-    if response.error.message:
-        st.error(f"Vision API 오류: {response.error.message}")
-        return shape, ""
-
     texts = response.text_annotations
-    text = texts[0].description.strip() if texts else ""
+
+    if texts:
+        text = texts[0].description.strip().replace("\n", " ")
+    else:
+        text = ""
 
     return shape, text
 
+# --- API 요청 함수 ---
 @st.cache_data(show_spinner=False)
 def search_pill(shape, print_code):
     API_KEY = st.secrets.get("drug_api_key") or "API_KEY_HERE"  # 여기에 API 키 삽입
@@ -93,6 +80,7 @@ def search_pill(shape, print_code):
     else:
         return []
 
+# --- 이미지 처리 및 결과 출력 ---
 if st.button("🔍 약 정보 검색하기"):
     if canvas_result.image_data is not None:
         image = Image.fromarray((canvas_result.image_data[:, :, :3]).astype(np.uint8))
