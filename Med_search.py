@@ -74,7 +74,7 @@ def process_pill_image(pil_image):
 @st.cache_data(show_spinner=False)
 def search_pill(shape, print_code):
     API_KEY = st.secrets.get("drug_api_key") or "API_KEY_HERE"  # 여기에 API 키 삽입
-    url = "https://apis.data.go.kr/1471000/DURPrdlstInfoService03/getPillList03"
+    url = "http://apis.data.go.kr/1471000/DURPrdlstInfoService03/getPillList03"
     params = {
         "serviceKey": API_KEY,
         "item_shape": shape,
