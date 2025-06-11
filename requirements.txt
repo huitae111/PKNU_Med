@@ -4,3 +4,4 @@ pytesseract
 Pillow
 streamlit-drawable-canvas
 easyocr
+google-cloud-vision
