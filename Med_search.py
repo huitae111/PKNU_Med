@@ -5,7 +5,6 @@ import numpy as np
 import cv2
 import requests
 import xml.etree.ElementTree as ET
-import os
 from google.cloud import vision
 from google.oauth2 import service_account
 
@@ -26,9 +25,14 @@ canvas_result = st_canvas(
 )
 
 # Google Cloud Vision API 인증
-google_creds = st.secrets["google_cloud"]
+google_creds = dict(st.secrets["google_cloud"])
+
+# 핵심: private_key 내부 '\\n'을 실제 줄바꿈 문자 '\n'로 바꾸기
+google_creds["private_key"] = google_creds["private_key"].replace("\\n", "\n")
+
 credentials = service_account.Credentials.from_service_account_info(google_creds)
 client = vision.ImageAnnotatorClient(credentials=credentials)
+
 
 def process_pill_image(pil_image):
     img = np.array(pil_image.convert("L"))  # 흑백 변환
@@ -61,6 +65,7 @@ def process_pill_image(pil_image):
 
     return shape, text
 
+
 # --- API 요청 함수 ---
 @st.cache_data(show_spinner=False)
 def search_pill(shape, print_code):
@@ -79,6 +84,7 @@ def search_pill(shape, print_code):
         return root.findall(".//item")
     else:
         return []
+
 
 # --- 이미지 처리 및 결과 출력 ---
 if st.button("🔍 약 정보 검색하기"):
