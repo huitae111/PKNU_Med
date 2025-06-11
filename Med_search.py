@@ -3,7 +3,7 @@ from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 import cv2
-import pytesseract
+import easyocr  # 추가
 import requests
 import xml.etree.ElementTree as ET
 
@@ -23,6 +23,9 @@ canvas_result = st_canvas(
     key="canvas",
 )
 
+# easyocr Reader 객체는 미리 생성해서 재사용 (속도 향상)
+reader = easyocr.Reader(['ko', 'en'], gpu=False)  # GPU 가능하면 True로 변경 가능
+
 def process_pill_image(pil_image):
     img = np.array(pil_image.convert("L"))  # 흑백
     _, thresh = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY_INV)
@@ -39,9 +42,10 @@ def process_pill_image(pil_image):
         else:
             shape = "기타"
 
-    # OCR 문자 추출
-    text = pytesseract.image_to_string(pil_image, config='--psm 7')
-    text = text.strip().replace("\n", " ")
+    # OCR 문자 추출 (easyocr 사용)
+    img_rgb = np.array(pil_image.convert('RGB'))
+    result = reader.readtext(img_rgb, detail=0)  # detail=0은 텍스트만 리스트로 반환
+    text = " ".join(result).strip()
 
     return shape, text
 
