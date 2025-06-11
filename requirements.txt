@@ -1,1 +1,5 @@
-ㅇㅇ
+streamlit
+opencv-python
+pytesseract
+Pillow
+streamlit-drawable-canvas
