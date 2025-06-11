@@ -7,10 +7,6 @@ import requests
 import xml.etree.ElementTree as ET
 from google.cloud import vision
 from google.oauth2 import service_account
-import urllib3
-
-# SSL 경고 무시 (과제용 임시 조치)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="약 모양 그리기 검색기", layout="centered")
 st.title("💊 약 모양 그리기 검색기")
@@ -30,10 +26,7 @@ canvas_result = st_canvas(
 
 # Google Cloud Vision API 인증
 google_creds = dict(st.secrets["google_cloud"])
-
-# 핵심: private_key 내부 '\\n'을 실제 줄바꿈 문자 '\n'로 바꾸기
 google_creds["private_key"] = google_creds["private_key"].replace("\\n", "\n")
-
 credentials = service_account.Credentials.from_service_account_info(google_creds)
 client = vision.ImageAnnotatorClient(credentials=credentials)
 
@@ -75,15 +68,35 @@ def process_pill_image(pil_image):
 def search_pill(shape, print_code):
     API_KEY = st.secrets.get("drug_api_key") or "API_KEY_HERE"  # 여기에 API 키 삽입
     url = "http://apis.data.go.kr/1471000/DURPrdlstInfoService03/getPillList03"
+
+    # --- shape를 API가 기대하는 코드로 변환 ---
+    # 예: API문서에서 item_shape가 1: 원형, 2: 타원형 이런 식이라면 아래처럼 맞춤
+    shape_code_map = {
+        "원형": "1",
+        "타원형": "2",
+        "기타": "",  # 빈 문자열이면 shape 필터 안함
+    }
+    shape_param = shape_code_map.get(shape, "")
+
+    # print_front는 첫 글자만 사용 (API 요구사항에 따라 수정 가능)
+    print_front_param = print_code.strip()[0] if print_code else ""
+
     params = {
         "serviceKey": API_KEY,
-        "item_shape": shape,
-        "print_front": print_code,
+        "item_shape": shape_param,
+        "print_front": print_front_param,
         "numOfRows": 5,
         "pageNo": 1,
     }
+
     # SSL 검증 무시 - 과제용 임시 조치
     res = requests.get(url, params=params, verify=False)
+
+    # 디버깅용 출력
+    st.write(f"요청 URL: {res.url}")
+    st.write(f"응답 코드: {res.status_code}")
+    st.write(f"응답 내용(일부): {res.text[:500]}")
+
     if res.status_code == 200:
         root = ET.fromstring(res.text)
         return root.findall(".//item")
@@ -99,7 +112,7 @@ if st.button("🔍 약 정보 검색하기"):
 
         st.subheader("📌 추정 결과")
         st.write(f"- 추정된 모양: **{shape}**")
-        st.write(f"- 추출된 문자: **{code}**")
+        st.write(f"- 추출된 문자: **'{code}'**")
 
         st.subheader("📋 약 정보 검색 결과")
         items = search_pill(shape, code)
