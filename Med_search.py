@@ -7,6 +7,10 @@ import requests
 import xml.etree.ElementTree as ET
 from google.cloud import vision
 from google.oauth2 import service_account
+import urllib3
+
+# SSL 경고 무시 (과제용 임시 조치)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="약 모양 그리기 검색기", layout="centered")
 st.title("💊 약 모양 그리기 검색기")
