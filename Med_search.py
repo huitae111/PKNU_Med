@@ -78,7 +78,8 @@ def search_pill(shape, print_code):
         "numOfRows": 5,
         "pageNo": 1,
     }
-    res = requests.get(url, params=params)
+    # SSL 검증 무시 - 과제용 임시 조치
+    res = requests.get(url, params=params, verify=False)
     if res.status_code == 200:
         root = ET.fromstring(res.text)
         return root.findall(".//item")
